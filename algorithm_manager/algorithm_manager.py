@@ -15,7 +15,6 @@ import os
 import json
 import logging
 import functools
-from concurrent.futures import ThreadPoolExecutor
 from common import tools
 
 
@@ -23,15 +22,17 @@ from common import tools
 app = Flask('am',static_url_path='')
 
 # mongodb数据库配置，暂无用到
-app.config['MONGODB_SETTINGS'] = {
-    'db':   'am',
-    'host': '127.0.0.1',
-    'port': 27018
-}
+# app.config['MONGODB_SETTINGS'] = {
+#     'db':   'am',
+#     'host': '127.0.0.1',
+#     'port': 27018
+# }
 
 # jsonfy中文乱码问题
 app.config['JSON_AS_ASCII'] = False
 logging.basicConfig(level=logging.DEBUG)
+if not os.path.exists(tools.ModelPath):
+    os.makedirs(tools.ModelPath)
 # session存储时间，暂无用到
 # app.config['SECRET_KEY'] = '123456'
 # app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=1)
@@ -40,7 +41,6 @@ logging.basicConfig(level=logging.DEBUG)
 
 # from flask_cors import CORS
 # CORS(app, supports_credentials=True)
-executor = ThreadPoolExecutor()
 
 # 统一返回json格式文本
 def response_return(re_msg):
@@ -81,13 +81,7 @@ def sending_file(id,filename):
 # 数据相关路由
 @app.route('/datacorr',methods=['POST'])
 def corr_data():
-    args = preprocess_handler.data_corr()
-    if type(args) is dict:
-        re_msg = args
-    else:
-        re_msg,args = args[0],args[1:]
-        if re_msg['code'] == 200:
-            executor.submit(lambda p: preprocess_handler.callback_corr(*p), args)
+    re_msg = preprocess_handler.data_corr()
 
     return response_return(re_msg)
 
@@ -116,7 +110,6 @@ def preprocess_data():
 @app.route('/train/<string:status>',methods=['POST'])
 def train_lr(status):
     re_msg = train_handler.lr_train(status)
-
     return response_return(re_msg)
 
 

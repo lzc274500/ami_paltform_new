@@ -10,26 +10,17 @@ import json
 import pandas as pd
 import numpy as np
 from common import tools
+from common.tools import asynch
 import os
 import time
-import seaborn as sns
-from matplotlib import pyplot as plt
-from collections import OrderedDict
+from celery_tasks.limit_task import tasks
 
 
-def get_limit():
-    json_data = request.get_json()
-    logging.info('a')
-    try:
-        file_url = json_data['file_url']
-    except Exception as e:
-        logging.info(e)
-        re_dict = {}
-        re_dict["code"] = 400
-        re_dict["message"] = "数据格式错误"
-        re_dict["return_time"] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
-        re_dict["data"] = []
-        return re_dict
+@asynch
+def callback_limit(json_data):
+    file_url = json_data['file_url']
+    callback_url = json_data['callback_url']
+    username = json_data['username']
     try:
         data = pd.read_csv(file_url)
     except Exception as e:
@@ -37,26 +28,48 @@ def get_limit():
         re_dict = {"code": 400,
                    "message": "读取文件失败",
                    "return_time": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())),
-                   "data":[]}
-        return re_dict
+                   "data":[{"username":username}]}
+        requests.post(callback_url, json=re_dict)
+        return
     start = data.columns.get_loc('Time')
-    limit1 = np.array([-1,1]).reshape(-1,1)
-    limit2 = np.array([-2,2]).reshape(-1,1)
-    limit3 = np.array([-3,3]).reshape(-1,1)
     rate_dict = {}
     for i in data.columns[start+1:]:
         rate_list = []
-        std = preprocessing.StandardScaler()
-        std.fit_transform(data[i].values.reshape(-1, 1))
-        limit1 = std.inverse_transform(limit1)
-        limit2 = std.inverse_transform(limit2)
-        limit3 = std.inverse_transform(limit3)
-        rate_list.append([round(i,4) for i in limit1.flatten().tolist()])
-        rate_list.append([round(i,4) for i in limit2.flatten().tolist()])
-        rate_list.append([round(i,4) for i in limit3.flatten().tolist()])
+        mean = data[i].mean()
+        std = data[i].std()
+        rate_list.append([round(mean-std,4),round(mean+std,4)])
+        rate_list.append([round(mean-2*std,4),round(mean+2*std,4)])
+        rate_list.append([round(mean-3*std,4),round(mean+3*std,4)])
         rate_dict[i] = rate_list
     alist = []
+    rate_dict["username"] = username
     alist.append(rate_dict)
+    re_dict = {}
+    re_dict["code"] = 200
+    re_dict["message"] = "请求成功"
+    re_dict["return_time"] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
+    re_dict["data"] = alist
+    requests.post(callback_url, json=re_dict)
+    return
+
+
+def get_limit():
+    json_data = request.get_json()
+    logging.info('a')
+    try:
+        file_url = json_data['file_url']
+        callback_url = json_data['callback_url']
+        username = json_data['username']
+    except Exception as e:
+        logging.info(e)
+        re_dict = {}
+        re_dict["code"] = 400
+        re_dict["message"] = "请传入参数"
+        re_dict["return_time"] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
+        re_dict["data"] = []
+        return re_dict
+    tasks.callback_limit.delay(json_data)
+    alist = []
     re_dict = {}
     re_dict["code"] = 200
     re_dict["message"] = "请求成功"
@@ -65,12 +78,56 @@ def get_limit():
     return re_dict
 
 
+@asynch
+def callback_changerate(json_data):
+    data_span = json_data['data_span']
+    time_span = json_data['time_span']
+    file_url = json_data['file_url']
+    callback_url = json_data['callback_url']
+    username = json_data['username']
+    changeRate = json_data['changeRate']
+    try:
+        data = pd.read_csv(file_url)
+    except Exception as e:
+        logging.info(e)
+        re_dict = {"code": 400,
+                   "message": "读取文件失败",
+                   "return_time": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())),
+                   "data":[{"username":username}]}
+        requests.post(callback_url, json=re_dict)
+        return
+
+    span = int(time_span / data_span)
+    print(span)
+    start = data.columns.get_loc('Time')
+    rate_dict = {}
+    for i in data.columns[start+1:]:
+        df = (data[i]-data[i].shift(span))/time_span
+        df = df.dropna().values
+        rate_dict[i] = [round(np.min(df),4),round(np.max(df),4)]
+
+    alist = []
+    rate_dict['username'] = username
+    rate_dict['changeRate'] = changeRate
+    alist.append(rate_dict)
+    re_dict = {}
+    re_dict["code"] = 200
+    re_dict["message"] = "请求成功"
+    re_dict["return_time"] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
+    re_dict["data"] = alist
+    requests.post(callback_url, json=re_dict)
+    return
+
+
 def get_changerate():
     json_data = request.get_json()
     try:
         data_span = json_data['data_span']
         time_span = json_data['time_span']
-        input = json_data['input']
+        file_url = json_data['file_url']
+        callback_url = json_data['callback_url']
+        username = json_data['username']
+        changeRate = json_data['changeRate']
     except Exception as e:
         re_dict = {}
         re_dict["code"] = 400
@@ -78,9 +135,7 @@ def get_changerate():
         re_dict["return_time"] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
         re_dict["data"] = []
         return re_dict
-
     remainder = time_span % data_span
-
     if remainder != 0:
         re_dict = {}
         re_dict["code"] = 400
@@ -88,21 +143,8 @@ def get_changerate():
         re_dict["return_time"] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
         re_dict["data"] = []
         return re_dict
-    span = int(time_span / data_span)
-    print(span)
-    data = np.array(input).astype(float)
-    df = pd.DataFrame(data=data,columns=['sample'])
-    print(df)
-    df['rate'] = (df['sample'].shift(span)-df['sample'])
-    print(df)
-    df = df.drop(df.index[:span])
-    upLimit = np.max(df['rate'].values)
-    downLimit = np.min(df['rate'].values)
+    tasks.callback_changerate.delay(json_data)
     alist = []
-    bdict = {}
-    bdict['upLimit'] = upLimit
-    bdict['downLimit'] = downLimit
-    alist.append(bdict)
     re_dict = {}
     re_dict["code"] = 200
     re_dict["message"] = "请求成功"
