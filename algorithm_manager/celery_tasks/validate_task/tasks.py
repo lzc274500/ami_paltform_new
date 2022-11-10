@@ -7,6 +7,7 @@ import joblib
 import numpy as np
 import pandas as pd
 import requests
+import tensorflow as tf
 from celery_tasks.main import celery_app
 from common import tools
 from keras.models import load_model
@@ -15,7 +16,7 @@ from interface.predict_interface import sequence_predict,sequence_validation,reg
 
 
 @celery_app.task(name='validate_callback')
-def validate_callback(json_data,filepath,model_id,algorithm,input,output,callback_url,username):
+def validate_callback(json_data,filepath,model_id,algorithm,input,output,callback_url,username,pathcall):
     path = os.path.join(tools.ModelPath, model_id+'.pkl')
     try:
         model = joblib.load(path)
@@ -24,7 +25,7 @@ def validate_callback(json_data,filepath,model_id,algorithm,input,output,callbac
         re_dict = {"code": 400,
                    "message": "模型文件不存在",
                    "return_time": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())),
-                   "data":[{"username":username,"modelId":model_id}]}
+                   "data":[{"username":username,"modelId":model_id,"path":pathcall}]}
         requests.post(callback_url, json=re_dict)
         return
     try:
@@ -34,14 +35,15 @@ def validate_callback(json_data,filepath,model_id,algorithm,input,output,callbac
         re_dict = {"code": 400,
                    "message": "读取文件失败",
                    "return_time": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())),
-                   "data":[{"username":username,"modelId":model_id}]}
+                   "data":[{"username":username,"modelId":model_id,"path":pathcall}]}
         requests.post(callback_url, json=re_dict)
         return
-    if np.any(data.isnull()):
+    data_length = len(data.index.values.tolist())
+    if np.any(data.isnull()) or data_length<100:
         re_dict = {"code": 400,
                    "message": "数据不完整",
                    "return_time": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())),
-                   "data":[{"username":username,"modelId":model_id}]}
+                   "data":[{"username":username,"modelId":model_id,"path":pathcall}]}
         requests.post(callback_url, json=re_dict)
         return
     test = pd.concat([data['Time'], data[input], data[output]], axis=1)
@@ -78,6 +80,7 @@ def validate_callback(json_data,filepath,model_id,algorithm,input,output,callbac
         scalery_path = os.path.join(tools.ModelPath, model_id + '.label')
         scaler_y = joblib.load(scalery_path)
         path = os.path.join(tools.ModelPath, model_id + '.h5')
+        tf.keras.backend.clear_session()
         model1 = load_model(path)
         sequence_length = json_data['sequence_length']
         interval = json_data['interval']
@@ -91,7 +94,7 @@ def validate_callback(json_data,filepath,model_id,algorithm,input,output,callbac
             re_dict = {"code": 400,
                        "message": "请传入正确的间隔时间",
                        "return_time": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())),
-                       "data": [{"username": username, "modelId": model_id}]}
+                       "data": [{"username": username, "modelId": model_id,"path":pathcall}]}
             requests.post(callback_url, json=re_dict)
             return
         span = future // interval
@@ -100,19 +103,19 @@ def validate_callback(json_data,filepath,model_id,algorithm,input,output,callbac
             re_dict = {"code": 400,
                        "message": "无法计算的间隔时间",
                        "return_time": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())),
-                       "data": [{"username": username, "modelId": model_id}]}
+                       "data": [{"username": username, "modelId": model_id,"path":pathcall}]}
             requests.post(callback_url, json=re_dict)
             return
-        span = span-1
+        # span = span-1
         data_all = np.array(test[test.columns[1:]]).astype(float)
         datax = []
         label = []
         timeseq = []
 
-        for i in range(len(data_all) - sequence_length-span):
-            datax.append(data_all[i: i + sequence_length])
-            label.append(test[test.columns[-1]].values[i + sequence_length+span])
-            timeseq.append(test[test.columns[0]].values[i + sequence_length+span])
+        for i in range(len(data_all) - sequence_length*span):
+            datax.append(data_all[i: i + sequence_length*span:span])
+            label.append(test[test.columns[-1]].values[i + sequence_length*span])
+            timeseq.append(test[test.columns[0]].values[i + sequence_length*span])
         x = np.array(datax).astype('float64')
         y = np.array(label).astype('float64')
         y_predict = sequence_predict(x,model1,model,scaler_y)
@@ -120,6 +123,7 @@ def validate_callback(json_data,filepath,model_id,algorithm,input,output,callbac
     bdict['modelId'] = model_id
     bdict['algorithm'] = algorithm
     bdict['username'] = username
+    bdict['path'] = pathcall
     alist.append(bdict)
     re_dict = {}
     re_dict["code"] = 200
@@ -127,3 +131,4 @@ def validate_callback(json_data,filepath,model_id,algorithm,input,output,callbac
     re_dict["return_time"] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
     re_dict["data"] = alist
     requests.post(callback_url, json=re_dict)
+    return

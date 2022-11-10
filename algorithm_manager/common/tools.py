@@ -1,14 +1,10 @@
 #!/usr/bin/python
 #coding:utf-8
-import platform
 import uuid
-import time
-from datetime import datetime
 from threading import Thread
-from concurrent.futures import ProcessPoolExecutor,ThreadPoolExecutor
 import logging
 
-executor = ThreadPoolExecutor(10)
+
 logger = logging.getLogger('gunicorn.error')
 FilePath = '/home/algorithm_manager/File'
 ModelPath = '/home/Model'
@@ -19,10 +15,10 @@ TempPath = '/home/algorithm_manager/temp'
 # ModelPath = 'E:/PycharmProjects/nodiot-algorithm/algorithm_manager/model'
 # TempPath = 'E:/PycharmProjects/nodiot-algorithm/algorithm_manager/temp'
 
-reg_list = ['linear','svr','xgbreg']
-cls_list = ['dtc','logistic']
+reg_list = ['linear','svr','xgbreg','rfreg','ridge','mlpreg']
+cls_list = ['dtc','logistic','svc','knn']
 clu_list = ['kmeans','meanshift']
-seq_list = ['lstm','gru']
+seq_list = ['lstm','gru','rnn']
 
 
 def get_id_bytype():
@@ -41,13 +37,3 @@ def asynch(fun):
         thr.start()
     return wrapper
 
-
-def asynch1(fun):
-    """
-    多线程实现异步执行
-    :param f:
-    :return:
-    """
-    def wrapper(*args, **kwargs):
-        executor.submit(fun,*args,**kwargs)
-    return wrapper

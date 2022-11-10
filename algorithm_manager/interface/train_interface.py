@@ -27,6 +27,13 @@ def format_data(data):
     return x,y
 
 
+# 分类特征提取
+def format_clsdata(data):
+    x = data[(data.columns[0:-2])]
+    y = data[(data.columns[-2:])]
+    return x,y
+
+
 # 序列化特征提取
 def format_seqdata(data,sequence_length,span):
     data_all = np.array(data[data.columns[1:]]).astype(float)
@@ -36,11 +43,11 @@ def format_seqdata(data,sequence_length,span):
     label = []
     timeseq = []
 
-    for i in range(len(data_all) - sequence_length-span):
-        datax.append(data_all[i: i + sequence_length])
+    for i in range(len(data_all) - sequence_length * span):
+        datax.append(data_all[i: i + sequence_length * span:span])
         # label.append(data_all[:,-1][i + sequence_length])
-        label.append(data[data.columns[-1]].values[i + sequence_length+span])
-        timeseq.append(time_data[i + sequence_length+span])
+        label.append(data[data.columns[-1]].values[i + sequence_length*span])
+        timeseq.append(time_data[i + sequence_length * span])
     x = np.array(datax).astype('float64')
     y = np.array(label).astype('float64')
     return x,y,timeseq

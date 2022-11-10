@@ -8,7 +8,8 @@ from flask import Flask, render_template, session, request
 from flask import jsonify
 from flask import make_response
 # from urllib3 import response
-from handler import upload_handler, train_handler, preprocess_handler, predict_handler, limit_handler, polyfit_handler
+from handler import upload_handler, train_handler, preprocess_handler, \
+    predict_handler, limit_handler, polyfit_handler,anomaly_handler
 #from flask_mongoengine import MongoEngine
 from flask import send_file
 import os
@@ -113,6 +114,22 @@ def train_lr(status):
     return response_return(re_msg)
 
 
+# 分类训练
+@app.route('/traincls',defaults={'status': ''}, methods=['POST'])
+@app.route('/traincls/<string:status>',methods=['POST'])
+def train_cls(status):
+    re_msg = train_handler.cls_train(status)
+    return response_return(re_msg)
+
+
+# 聚类训练
+@app.route('/trainclu',defaults={'status': ''}, methods=['POST'])
+@app.route('/trainclu/<string:status>',methods=['POST'])
+def train_clu(status):
+    re_msg = train_handler.clu_train(status)
+    return response_return(re_msg)
+
+
 # 预测路由
 @app.route('/predict',methods=['POST'])
 def predict_model():
@@ -146,6 +163,20 @@ def limit_rate():
 def fit_ploy():
     re_msg = polyfit_handler.polyfit_reg()
     return response_return(re_msg)
+
+
+@app.route('/multiployfit',methods=['POST'])
+def fit_multiploy():
+    re_msg = polyfit_handler.multi_polyfit()
+    return response_return(re_msg)
+
+
+@app.route('/anomaly',methods=['POST'])
+def detect_anomaly():
+    re_msg = anomaly_handler.anomaly_detect()
+    return response_return(re_msg)
+
+
 
 
 # 测试回调路由

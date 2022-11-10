@@ -12,4 +12,5 @@ celery_app.autodiscover_tasks(['celery_tasks.train',
                                'celery_tasks.preprocess_task',
                                'celery_tasks.validate_task',
                                'celery_tasks.limit_task',
-                               'celery_tasks.polyfit_task'])
+                               'celery_tasks.polyfit_task',
+                               'celery_tasks.anomaly_task'])

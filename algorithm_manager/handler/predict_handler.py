@@ -18,6 +18,7 @@ from docx import Document
 from cachetools import cached,LRUCache
 from celery_tasks.validate_task import tasks
 
+
 # 阈值
 def get_threshold(test1,model_id):
     test = pd.DataFrame.copy(test1, deep=True)
@@ -110,15 +111,14 @@ def regression_validation(y_test,y_predict,tlabel):
     return bdict
 
 
-def classification_predict(test,model):
-    std = preprocessing.StandardScaler()
-    x_test = std.fit_transform(test)
+def classification_predict(test,model,scaler_x):
+    x_test = scaler_x.transform(test)
     y_predict = model.predict(x_test)
     return y_predict
 
 
-def classification_validation(y_test,y_predict):
-    report = metrics.classification_report(y_test, y_predict, labels=[0,1],output_dict=True)
+def classification_validation(y_test,y_predict,labels_cls):
+    report = metrics.classification_report(y_test, y_predict, labels=labels_cls,output_dict=True)
     bdict = {}
     bdict = report
     return bdict
@@ -146,13 +146,14 @@ def model_validate():
         output = json_data['output']
         callback_url = json_data['callback_url']
         username = json_data['username']
+        pathcall = json_data['path']
     except Exception as e:
         re_dict = {"code": 400,
                    "message": "请传入请求参数",
                    "return_time": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())),
                    "data":[]}
         return re_dict
-    tasks.validate_callback.delay(json_data,filepath,model_id,algorithm,input,output,callback_url,username)
+    tasks.validate_callback.delay(json_data,filepath,model_id,algorithm,input,output,callback_url,username,pathcall)
     re_dict = {}
     re_dict["code"] = 200
     re_dict["message"] = "验证中"
@@ -225,7 +226,16 @@ def model_predict():
         scalery_path = os.path.join(tools.ModelPath, model_id + '.label')
         scaler_y = joblib.load(scalery_path)
         print(time.time())
-        y_predict = sequence_predict_intime(test,model1,model,scaler_y)
+        try:
+            y_predict = sequence_predict_intime(test,model1,model,scaler_y)
+        except Exception as e:
+            logger.info(e)
+            re_dict = {}
+            re_dict["code"] = 400
+            re_dict["message"] = "模型输入数据不匹配"
+            re_dict["return_time"] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
+            re_dict["data"] = alist
+            return re_dict
         print(time.time())
         bdict['predictValue'] = [round(i,4) for i in y_predict.flatten().tolist()]
 

@@ -70,10 +70,6 @@ logconfig_dict = {
             "format": "'[%(process)d] [%(asctime)s] %(levelname)s [%(filename)s:%(lineno)s] %(message)s'", # 打日志的格式
             "datefmt": "[%Y-%m-%d %H:%M:%S %z]",# 时间显示方法
             "class": "logging.Formatter"
-        },
-        "access": {
-            "format": "'[%(process)d] [%(asctime)s] %(levelname)s [%(filename)s:%(lineno)s] %(message)s'",
-            "class": "logging.Formatter"
         }
     }
 }

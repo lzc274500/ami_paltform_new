@@ -22,6 +22,7 @@ def data_corr():
         top_num = json_data['top_num']
         callback_url = json_data['callback_url']
         username = json_data['username']
+        pathcall = json_data['path']
     except Exception as e:
         re_dict = {"code": 400,
                    "message": "请传入请求参数",
@@ -70,13 +71,14 @@ def preprocess():
         username = json_data['username']
         callback_url = json_data['callback_url']
         filterCalc = json_data['filterCalc']
+        pathcall = json_data['path']
     except Exception as e:
         re_dict = {"code": 400,
                    "message": "请传入请求参数",
                    "return_time": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())),
                    "data":[]}
         return re_dict
-    tasks.preprocess_callback.delay(filename,input,output,callback_url,model_id,username,filterCalc)
+    tasks.preprocess_callback.delay(filename,input,output,callback_url,model_id,username,filterCalc,pathcall)
     re_dict = {}
     re_dict["code"] = 200
     re_dict["message"] = "验证中"
